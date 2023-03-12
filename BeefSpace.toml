@@ -1,0 +1,13 @@
+FileVersion = 1
+Locked = ["corlib"]
+[Projects.corlib]
+Path = "C:\\Users\\Willi\\AppData\\Local\\BeefLang\\BeefLibs\\corlib"
+
+[Projects.Toml]
+Path = "."
+
+[WorkspaceFolders]
+Packages = []
+
+[Workspace]
+StartupProject = "Toml"

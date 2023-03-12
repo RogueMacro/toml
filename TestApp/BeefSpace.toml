@@ -1,0 +1,19 @@
+FileVersion = 1
+Locked = ["corlib"]
+[Projects.corlib]
+Path = "C:\\Users\\Willi\\AppData\\Local\\BeefLang\\BeefLibs\\corlib"
+
+[Projects.TestApp]
+Path = "."
+
+[Projects."TestApp/Toml"]
+Path = ".\\.."
+
+[Projects.Serialize]
+Path = ".\\..\\../Serialize"
+
+[WorkspaceFolders]
+Packages = []
+
+[Workspace]
+StartupProject = "TestApp"
