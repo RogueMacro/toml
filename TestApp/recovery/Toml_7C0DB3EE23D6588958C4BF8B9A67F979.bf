@@ -16,10 +16,10 @@ namespace Toml
 			value.Serialize<TomlSerializer>((.)serializer);
 		}
 
-		public Result<void> Deserialize<T>(IDeserializer deserializer, T* value)
+		public Result<T> Deserialize<T>(IDeserializer deserializer)
 			where T : ISerializable
 		{
-			return T.Deserialize<TomlDeserializer>((.)deserializer, (.)value);
+			return T.Deserialize<TomlDeserializer>((.)deserializer);
 		}
 	}
 }

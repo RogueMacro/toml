@@ -43,7 +43,7 @@ namespace Toml.Internal
 				char8 next = Try!(Peek());
 				if (next == '"')
 				{
-					Try!(DeserializeString(&key));
+					key = Try!(DeserializeString());
 				}
 				else
 				{
@@ -80,17 +80,18 @@ namespace Toml.Internal
 			return .Ok;
 		}
 
-		public Result<void> DeserializeMap<TKey, TValue>(Dictionary<TKey, TValue>* outValue) where TKey : String where TValue : ISerializable
+		public Result<Dictionary<TKey, TValue>> DeserializeMap<TKey, TValue>()
+			where TKey : String where TValue : ISerializable
 		{
 			return .Err;
 		}
 
-		public Result<void> DeserializeList<T>(List<T>* outValue) where T : ISerializable
+		public Result<List<T>> DeserializeList<T>() where T : ISerializable
 		{
 			return .Err;
 		}
 
-		public Result<void> DeserializeString(String* outValue)
+		public Result<String> DeserializeString()
 		{
 			String string = scope .();
 
@@ -106,12 +107,18 @@ namespace Toml.Internal
 				string.Append(char);
 			}
 
-			*outValue = new .();
-			return string.Unescape(*outValue);
+			String escaped = new .();
+			if (string.Unescape(escaped) case .Err)
+			{
+				delete escaped;
+				return .Err;
+			}
+
+			return escaped;
 		}
 
 		// TODO: Support binary and '0o' prefix
-		public Result<void> DeserializeInt(int* outValue)
+		public Result<int> DeserializeInt()
 		{
 			let pos = Reader.Position;
 			String str = scope .();
@@ -146,8 +153,7 @@ namespace Toml.Internal
 
 			if (int.Parse(str) case .Ok(let val))
 			{
-				*outValue = val;
-				return .Ok;
+				return val;
 			}
 
 			ErrorAt!(pos, new $"Invalid integer", Reader.Position - pos);
@@ -202,7 +208,7 @@ namespace Toml.Internal
 			return .Err;
 		}
 
-		public Result<void> DeserializeBool(bool* outValue)
+		public Result<bool> DeserializeBool()
 		{
 			let char = Try!(Read());
 			if (char == 't')
@@ -210,7 +216,7 @@ namespace Toml.Internal
 				Expect('r');
 				Expect('u');
 				Expect('e');
-				*outValue = true;
+				return true;
 			}
 			else if (char == 'f')
 			{
@@ -218,14 +224,14 @@ namespace Toml.Internal
 				Expect('l');
 				Expect('s');
 				Expect('e');
-				*outValue = false;
+				return false;
 			}
 			else
 			{
 				Error!(new $"Expected 'true' or 'false'");
 			}
 
-			return .Ok;
+			//return .Ok;
 		}
 
 		public bool DeserializeNull()

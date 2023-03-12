@@ -56,9 +56,7 @@ namespace System
 		public static Result<Self> Deserialize<D>(D deserializer)
 			where D : IDeserializer
 		{
-			String s = ?;
-			Try!(deserializer.DeserializeString(&s));
-			return s;
+			return deserializer.DeserializeString();
 		}
 	}
 
@@ -73,9 +71,7 @@ namespace System
 		public static Result<Self> Deserialize<D>(D deserializer)
 			where D : IDeserializer
 		{
-			bool b = ?;
-			Try!(deserializer.DeserializeBool(&b));
-			return b;
+			return Try!(deserializer.DeserializeBool());
 		}
 	}
 
@@ -88,148 +84,147 @@ namespace System
 			serializer.SerializeInt((.)this);
 		}
 
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
+		public static Result<Self> Deserialize<D>(D deserializer)
 			where D : IDeserializer
 		{
-			Try!(deserializer.DeserializeInt((.)outValue));
-			return .Ok;
+			return Try!(deserializer.DeserializeInt());
 		}
 	}
 
-	extension Int8 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeInt((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeInt8((.)outValue);
-		}
-	}
-
-	extension Int16 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeInt((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeInt16((.)outValue);
-		}
-	}
-
-	extension Int32 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeInt((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeInt32((.)outValue);
-		}
-	}
-
-	extension Int64 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeInt((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeInt64((.)outValue);
-		}
-	}
-
-	extension UInt : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeUInt((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeUInt((.)outValue);
-		}
-	}
-
-	extension UInt8 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeUInt8((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeUInt8((.)outValue);
-		}
-	}
-
-	extension UInt16 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeUInt16((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeUInt16((.)outValue);
-		}
-	}
-
-	extension UInt32 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeUInt32((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeUInt32((.)outValue);
-		}
-	}
-
-	extension UInt64 : ISerializable
-	{
-		public void Serialize<S>(S serializer)
-			where S : ISerializer
-		{
-			serializer.SerializeUInt64((.)this);
-		}
-
-		public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
-			where D : IDeserializer
-		{
-			return deserializer.DeserializeUInt64((.)outValue);
-		}
-	}
+//	extension Int8 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeInt((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return Try!(deserializer.DeserializeInt8());
+//		}
+//	}
+//
+//	extension Int16 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeInt((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeInt16((.)outValue);
+//		}
+//	}
+//
+//	extension Int32 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeInt((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeInt32((.)outValue);
+//		}
+//	}
+//
+//	extension Int64 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeInt((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeInt64((.)outValue);
+//		}
+//	}
+//
+//	extension UInt : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeUInt((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeUInt((.)outValue);
+//		}
+//	}
+//
+//	extension UInt8 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeUInt8((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeUInt8((.)outValue);
+//		}
+//	}
+//
+//	extension UInt16 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeUInt16((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeUInt16((.)outValue);
+//		}
+//	}
+//
+//	extension UInt32 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeUInt32((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeUInt32((.)outValue);
+//		}
+//	}
+//
+//	extension UInt64 : ISerializable
+//	{
+//		public void Serialize<S>(S serializer)
+//			where S : ISerializer
+//		{
+//			serializer.SerializeUInt64((.)this);
+//		}
+//
+//		public static Result<Self> Deserialize<D>(D deserializer)
+//			where D : IDeserializer
+//		{
+//			return deserializer.DeserializeUInt64((.)outValue);
+//		}
+//	}
 #endregion
 
 	namespace Collections
@@ -251,10 +246,10 @@ namespace System
 				serializer.SerializeMapEnd();
 			}
 
-			public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
+			public static Result<Self> Deserialize<D>(D deserializer)
 				where D : IDeserializer
 			{
-				return deserializer.DeserializeMap<TKey, TValue>(outValue);
+				return deserializer.DeserializeMap<TKey, TValue>();
 			}
 		}
 
@@ -267,10 +262,10 @@ namespace System
 				serializer.SerializeList(this);
 			}
 
-			public static Result<void> Deserialize<D>(D deserializer, Self* outValue)
+			public static Result<Self> Deserialize<D>(D deserializer)
 				where D : IDeserializer
 			{
-				return deserializer.DeserializeList<T>(outValue);
+				return deserializer.DeserializeList<T>();
 			}
 		}
 	}

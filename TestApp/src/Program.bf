@@ -10,7 +10,7 @@ namespace TestApp
 		[Serializable]
 		class Data
 		{
-			public uint Port;
+			public int Port;
 			public String Name ~ delete _;
 			public bool Active;
 			//public List<int> Ports = new .() { 8000, 8080, 42 } ~ delete _;
@@ -99,7 +99,7 @@ namespace TestApp
 			Data data = scope .()
 				{
 					Port = 42,
-				  	Name = new .("Server")
+				  	Name = new .("Server\n")
 				};
 			//{
 			//	Servers = new .() {
@@ -134,7 +134,7 @@ namespace TestApp
 
 			String str = scope
 				$"""
-				Port = 0xFFFFFFFFFFFFFFFF
+				Port = 42
 				Name = "Server1"
 				""";
 

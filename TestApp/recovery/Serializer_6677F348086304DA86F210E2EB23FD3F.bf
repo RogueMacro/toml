@@ -99,7 +99,7 @@ namespace Toml.Internal
 
 		public void SerializeString(String string)
 		{
-			Writer.Write("\"{}\"", string);
+			Writer.Write("\"{}\"", string.Escape(.. scope .()));
 		}
 
 		public void SerializeInt(int i)

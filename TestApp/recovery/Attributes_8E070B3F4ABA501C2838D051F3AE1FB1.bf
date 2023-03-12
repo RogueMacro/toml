@@ -89,6 +89,9 @@ namespace Serialize
 					where S : Serialize.Implementation.IDeserializer
 				{{
 					Self self = {(type.IsValueType ? "" : "new ")}Self();
+					bool ok = false;
+					defer {{ if (!ok) delete self; }}
+
 					System.Collections.List<StringView> fieldsLeft = scope .(){{ {fieldList} }};
 
 					Try!(deserializer.DeserializeStructStart({fieldCount}));
@@ -153,6 +156,7 @@ namespace Serialize
 					}}
 
 					Try!(deserializer.DeserializeStructEnd());
+					ok = true;
 					return .Ok(self);
 				}}
 				""");

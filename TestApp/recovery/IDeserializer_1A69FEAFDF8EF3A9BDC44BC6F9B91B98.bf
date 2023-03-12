@@ -6,8 +6,6 @@ namespace Serialize.Implementation
 {
 	interface IDeserializer
 	{
-		bool AllowMissingFields
-
 		Reader Reader { get; set; }
 
 		DeserializeError Error { get; set; }
@@ -17,31 +15,31 @@ namespace Serialize.Implementation
 		Result<void> DeserializeStructField(delegate Result<void>(StringView field) deserialize, Span<StringView> fieldsLeft);
 		Result<void> DeserializeStructEnd();
 
-		Result<void> DeserializeMap<TKey, TValue>(Dictionary<TKey, TValue>* outValue)
+		Result<Dictionary<TKey, TValue>> DeserializeMap<TKey, TValue>()
 			where TKey : String
 			where TValue : ISerializable;
 
-		Result<void> DeserializeList<T>(List<T>* outValue)
+		Result<List<T>> DeserializeList<T>()
 			where T : ISerializable;
 
-		Result<void> DeserializeString(String* outValue);
+		Result<void> DeserializeString();
 
-		Result<void> DeserializeInt(int* outValue);
-		Result<void> DeserializeInt8(int8* outValue) => EnsureSize<int8, int>(outValue, scope => DeserializeInt, int8.MinValue, int8.MaxValue);
-		Result<void> DeserializeInt16(int16* outValue) => EnsureSize<int16, int>(outValue, scope => DeserializeInt, int16.MinValue, int16.MaxValue);
-		Result<void> DeserializeInt32(int32* outValue) => EnsureSize<int32, int>(outValue, scope => DeserializeInt, int32.MinValue, int32.MaxValue);
-		Result<void> DeserializeInt64(int64* outValue) => EnsureSize<int64, int>(outValue, scope => DeserializeInt, int64.MinValue, int64.MaxValue);
+		Result<int> DeserializeInt();
+		//Result<void> DeserializeInt8() => EnsureSize<int8, int>(outValue, scope => DeserializeInt, int8.MinValue, int8.MaxValue);
+		//Result<void> DeserializeInt16() => EnsureSize<int16, int>(outValue, scope => DeserializeInt, int16.MinValue, int16.MaxValue);
+		//Result<void> DeserializeInt32() => EnsureSize<int32, int>(outValue, scope => DeserializeInt, int32.MinValue, int32.MaxValue);
+		//Result<void> DeserializeInt64() => EnsureSize<int64, int>(outValue, scope => DeserializeInt, int64.MinValue, int64.MaxValue);
 
-		Result<void> DeserializeUInt(uint* outValue);
-		Result<void> DeserializeUInt8(uint8* outValue) => EnsureSize<uint8, uint>(outValue, scope => DeserializeUInt, uint8.MinValue, uint8.MaxValue);
-		Result<void> DeserializeUInt16(uint16* outValue) => EnsureSize<uint16, uint>(outValue, scope => DeserializeUInt, uint16.MinValue, uint16.MaxValue);
-		Result<void> DeserializeUInt32(uint32* outValue) => EnsureSize<uint32, uint>(outValue, scope => DeserializeUInt, uint32.MinValue, uint32.MaxValue);
-		Result<void> DeserializeUInt64(uint64* outValue) => EnsureSize<uint64, uint>(outValue, scope => DeserializeUInt, uint64.MinValue, uint64.MaxValue);
+		//Result<uint> DeserializeUInt();
+		//Result<void> DeserializeUInt8() => EnsureSize<uint8, uint>(outValue, scope => DeserializeUInt, uint8.MinValue, uint8.MaxValue);
+		//Result<void> DeserializeUInt16() => EnsureSize<uint16, uint>(outValue, scope => DeserializeUInt, uint16.MinValue, uint16.MaxValue);
+		//Result<void> DeserializeUInt32() => EnsureSize<uint32, uint>(outValue, scope => DeserializeUInt, uint32.MinValue, uint32.MaxValue);
+		//Result<void> DeserializeUInt64() => EnsureSize<uint64, uint>(outValue, scope => DeserializeUInt, uint64.MinValue, uint64.MaxValue);
 
-		Result<void> DeserializeDouble(double* outValue);
-		Result<void> DeserializeFloat(float* outValue) => EnsureSize<float, double>(outValue, scope => DeserializeDouble, float.MinValue, float.MaxValue);
+		//Result<void> DeserializeDouble();
+		//Result<void> DeserializeFloat() => EnsureSize<float, double>(outValue, scope => DeserializeDouble, float.MinValue, float.MaxValue);
 
-		Result<void> DeserializeBool(bool* outValue);
+		Result<bool> DeserializeBool();
 
 		bool DeserializeNull();
 

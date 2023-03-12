@@ -11,7 +11,7 @@ namespace Serialize.Implementation
 		void Serialize<T>(ISerializer serializer, T value)
 			where T : ISerializable;
 
-		Result<void> Deserialize<T>(IDeserializer deserializer, T* value)
+		Result<T> Deserialize<T>(IDeserializer deserializer)
 			where T : ISerializable;
 	}
 }

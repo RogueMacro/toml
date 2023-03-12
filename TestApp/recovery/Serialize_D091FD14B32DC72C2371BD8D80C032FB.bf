@@ -44,33 +44,18 @@ namespace Serialize
 			deserializer.Reader = scope .(str);
 			defer delete deserializer;
 
-			T* value = (.)Internal.Malloc(sizeof(T));
-			if (_format.Deserialize<T>(deserializer, value) case .Err)
+			let result = _format.Deserialize<T>(deserializer);
+			if (result case .Err)
 			{
 				if (Error != null)
 					delete Error;
 				Error = deserializer.Error;
-				deserializer.SetError(null);
+				deserializer.Error = null;
 
-				Delete!(*value);
-				Internal.Free(value);
 				return .Err;
 			}
 
-			return *value;
+			return result.Get();
 		}
-
-		static mixin Delete<T>(T value) where T : delete
-		{
-			delete value;
-		}
-
-		static mixin Delete<T>(T value) where T : IDisposable
-		{
-			value.Dispose();
-		}
-
-		static mixin Delete<T>(T value) {}
-
 	}
 }
