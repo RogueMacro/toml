@@ -4,6 +4,8 @@ TOML implementation for the [Serialize](https://github.com/RogueMacro/serialize)
 
 ## Usage
 
+> More extensive examples available in `src/Tests/`
+
 ```cs
 using Serialize;
 using Toml;
