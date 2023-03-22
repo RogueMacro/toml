@@ -10,6 +10,7 @@ namespace Toml.Internal
 	class TomlSerializer : ISerializer
 	{
 		public StreamWriter Writer { get; set; }
+		public String NumberFormat { get; set; }
 		public SerializeOrder SerializeOrder { get => .PrimitivesArraysMaps; }
 
 		private String _parent = new .() ~ delete _;
@@ -22,15 +23,23 @@ namespace Toml.Internal
 			if (value == null)
 				return;
 
-			let genericType = (typeof(T) as SpecializedGenericType)?.UnspecializedType;
+			let genericType = (typeof(T) as SpecializedGenericType);
 
-			if (genericType == typeof(Dictionary<>))
+			if (genericType?.UnspecializedType == typeof(Dictionary<>))
 			{
 				SerializeMap(key, value);
+				return;
 			}
-			else if (typeof(T).IsPrimitive ||
-				typeof(T) == typeof(String) ||
-				genericType == typeof(List<>))
+
+			if (genericType?.UnspecializedType == typeof(List<>) &&
+				Util.IsMap(genericType.GetGenericArg(0)))
+			{
+				using (Parent!(key))
+					value.Serialize(this);
+				return;
+			}
+
+			if (!Util.IsMap(typeof(T)))
 			{
 				Writer.Write("{} = ", key);
 				value.Serialize(this);
@@ -50,12 +59,8 @@ namespace Toml.Internal
 			where T : ISerializable
 		{
 			let genericValueArg = (typeof(T) as SpecializedGenericType).GetGenericArg(1);
-			if (genericValueArg.IsPrimitive ||
-				genericValueArg == typeof(String) ||
-				(genericValueArg as SpecializedGenericType)?.UnspecializedType == typeof(List<>))
-			{
+			if (!Util.IsMap(genericValueArg))
 				Writer.WriteLine("\n[{}{}]", _parent, key);
-			}
 
 			using (Parent!(key)) value.Serialize(this);
 		}
@@ -63,10 +68,7 @@ namespace Toml.Internal
 		public void SerializeList<T>(List<T> list)
 			where T : ISerializable
 		{
-			if (!(typeof(T).IsPrimitive ||
-				typeof(T) == typeof(String) ||
-				(typeof(T) is SpecializedGenericType &&
-				(typeof(T) as SpecializedGenericType).UnspecializedType == typeof(List<>))))
+			if (Util.IsMap(typeof(T)))
 			{
 				for (let value in list)
 				{
@@ -110,6 +112,36 @@ namespace Toml.Internal
 		public void SerializeUInt(uint i)
 		{
 			Writer.Write("{}", i);
+		}
+
+		public void SerializeDouble(double i)
+		{
+			Writer.Write("{}", i);
+		}
+
+		public void SerializeFloat(float i)
+		{
+			Writer.Write(i.ToString(.. scope .(), NumberFormat, null));
+		}
+
+		public void SerializeDateTime(DateTime date)
+		{
+			let hasDate = date.Year != 1 || date.Month != 1 || date.Day != 1;
+			let hasTime = date.Hour != 0 || date.Minute != 0 || date.Second != 0;
+
+			if (hasDate)
+				Writer.Write("{0:yyyy-MM-dd}", date);
+
+			if (hasDate && hasTime)
+				Writer.Write(" ");
+
+			if (hasTime)
+			{
+				if (date.Millisecond != 0)
+					Writer.Write("{0:HH:mm:ss.fffK}", date);
+				else
+					Writer.Write("{0:HH:mm:ssK}", date);
+			}
 		}
 
 		public void SerializeBool(bool b)
