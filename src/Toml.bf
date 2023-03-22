@@ -21,5 +21,19 @@ namespace Toml
 		{
 			return T.Deserialize<TomlDeserializer>((.)deserializer);
 		}
+
+		public static void Serialize<T>(T value, String buffer)
+			where T : ISerializable
+		{
+			Serialize<Toml> serializer = scope .();
+			serializer.Serialize(value, buffer);
+		}
+
+		public static Result<T> Deserialize<T>(StringView str)
+			where T : ISerializable
+		{
+			Serialize<Toml> serializer = scope .();
+			return serializer.Deserialize<T>(str);
+		}
 	}
 }
