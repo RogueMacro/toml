@@ -20,8 +20,29 @@ namespace Toml.Internal
 		private bool _inline => _inlineDepth > 0;
 		private uint _inlineDepth = 0;
 
-		private String _parent = new .() ~ delete _;
-		private StringView _parentKey => _parent.Substring(0, Math.Max(_parent.Length - 1, 0));
+		private Key _parent = new .() ~ delete _;
+
+		private List<State> _state = new .() ~ DeleteContainerAndItems!(_);
+
+		public void PushState()
+		{
+			_state.Add(new .()
+				{
+					Parent = new .(_parent),
+					InlineDepth = _inlineDepth
+				});
+		}
+
+		public void PopState()
+		{
+			let state = _state.PopBack();
+			delete _parent;
+			_parent = state.Parent;
+			_inlineDepth = state.InlineDepth;
+
+			state.Used();
+			delete state;
+		} 
 
 		public Result<void> DeserializeStructStart(int size)
 		{
@@ -76,14 +97,14 @@ namespace Toml.Internal
 				if (Try!(Peek(1)) == '[')
 				{
 					let pos = Reader.Position;
-					String key = scope .();
+					Key key = scope .();
 					Try!(Read());
 					Try!(Read());
 					Try!(ReadKey(key));
 					Reader.[Friend]Position = pos;
 
-					key.Remove(0, _parent.Length);
-					let field = Try!(key.Split('.').GetNext());
+					key.RemoveFromStart(_parent);
+					let field = key.First();
 
 					using (Parent!(field))
 					{
@@ -105,18 +126,18 @@ namespace Toml.Internal
 				let bracketPos = Reader.Position;
 				Try!(Read());
 				Try!(ConsumeWhitespace());
-				String key = scope .();
+				Key key = scope .();
 				let keyPos = Reader.Position;
 				Try!(ReadKey(key));
 				Try!(ConsumeWhitespace());
 				Expect!(']');
 				Try!(ConsumeLine());
 
-				StringView field = key;
-				if (key != _parentKey && key.Contains('.'))
+				String field = key.First();
+				if (!key.Equals(_parent) && key.Depth > 1)
 				{
-					key.Remove(0, _parent.Length);
-					field = Try!(key.Split('.').GetNext());
+					key.RemoveFromStart(_parent);
+					field = key.First();
 					Reader.[Friend]Position = bracketPos;
 				}
 
@@ -143,20 +164,24 @@ namespace Toml.Internal
 				}
 
 				let keyPos = Reader.Position;
-				String key = scope .();
+				Key key = scope .();
 				Try!(ReadKey(key));
+				if (key.Depth > 1)
+					Error!(new $"Dotted keys are not supported");
+
+				let field = key.First();
 
 				Try!(ConsumeWhitespace());
 				Expect!('=');
 				Try!(ConsumeWhitespace());
 
 				_inlineDepth++;
-				if (deserialize(key) case .Err(let err))
+				if (deserialize(field) case .Err(let err))
 				{
 					switch (err)
 					{
 					case .UnknownField:
-						ErrorAt!(keyPos, new $"Unknown member '{key}'", Math.Max(key.Length, 1));
+						ErrorAt!(keyPos, new $"Unknown member '{field}'", Math.Max(field.Length, 1));
 					case .DeserializationError:
 						return .Err;
 					}
@@ -198,15 +223,17 @@ namespace Toml.Internal
 
 			while (Try!(Peek()) != '}')
 			{
-				String key = scope .();
+				Key key = scope .();
 				Try!(ReadKey(key));
+				if (key.Depth > 1)
+					Error!("Dotted keys are not supported");
 
 				Try!(ConsumeWhitespace());
 				Expect!('=');
 				Try!(ConsumeWhitespace());
 
 				let value = Try!(TValue.Deserialize(this));
-				dict.Add(new .(key), (.)value);
+				dict.Add(new String(key.First()), (.)value);
 
 				Try!(ConsumeWhitespace());
 			}
@@ -226,18 +253,18 @@ namespace Toml.Internal
 				{
 					let bracketPos = Reader.Position;
 					Expect!('[');
-					String key = scope .();
+					Key key = scope .();
 					Try!(ReadKey(key));
 					Expect!(']');
 
-					if (key == _parentKey)
+					if (key.Equals(_parent))
 					{
 						if (ConsumeWhitespace() case .Err)
 							return .Ok;
 						peek = Peek();
 						continue;
 					}
-					else if (!key.StartsWith(_parent))
+					else if (!key.IsChildOf(_parent))
 					{
 						Reader.[Friend]Position = bracketPos;
 						return .Ok;
@@ -246,23 +273,21 @@ namespace Toml.Internal
 					{
 						Try!(ConsumeLine());
 
-						key.Remove(0, _parent.Length);
-						if (key.Contains('.'))
-						{
-							key.RemoveToEnd(key.IndexOf('.'));
+						key.RemoveFromStart(_parent);
+						if (key.Depth > 1)
 							Reader.[Friend]Position = bracketPos;
-						}
 
-						using (Parent!(key))
+						String strKey = key.First();
+						using (Parent!(strKey))
 						{
-							if (dict.ContainsKey(key))
+							if (dict.ContainsKey(strKey))
 							{
-								TryDeserializeTable!(dict[key]);
+								TryDeserializeTable!(dict[strKey]);
 							}
 							else
 							{
 								let value = Try!(TValue.Deserialize(this));
-								dict.Add(new .(key), (.)value);
+								dict.Add(new String(strKey), (.)value);
 							}
 						}
 
@@ -272,14 +297,17 @@ namespace Toml.Internal
 					}
 				}
 
-				String key = scope .();
+				Key key = scope .();
 				Try!(ReadKey(key));
+				if (key.Depth > 1)
+					Error!("Dotted keys are not supported");
+
 				Try!(ConsumeWhitespace());
 				Expect!('=');
 				Try!(ConsumeWhitespace());
 
 				let value = Try!(TValue.Deserialize(this));
-				dict.Add(new .(key), (.)value);
+				dict.Add(new String(key.First()), (.)value);
 				
 				Try!(ConsumeLine());
 				peek = Peek();
@@ -332,7 +360,7 @@ namespace Toml.Internal
 
 		private Result<void> DeserializeListOfObjects<T>(List<T> list) where T : ISerializable
 		{
-			String key = scope .();
+			Key key = scope .();
 
 			while (true)
 			{
@@ -347,13 +375,13 @@ namespace Toml.Internal
 				Expect!('[');
 				Expect!('[');
 				Try!(ConsumeWhitespace());
-				String key2 = scope .();
-				if (key.IsEmpty)
+				Key key2 = scope .();
+				if (key.Depth == 0)
 					Try!(ReadKey(key));
 				else
 				{
 					Try!(ReadKey(key2));
-					if (key2 != key)
+					if (!key2.Equals(key))
 					{
 						Reader.[Friend]Position = pos;
 						break;
@@ -375,7 +403,7 @@ namespace Toml.Internal
 		{
 			String string = scope .();
 
-			Try!(ConsumeChar('"'));
+			Expect!('"');
 			while (true)
 			{
 				let char = Try!(Read());
@@ -612,16 +640,37 @@ namespace Toml.Internal
 			return false;
 		}
 
-		private Result<void> ReadKey(String buffer)
+		private Result<void> ReadKey(Key key)
 		{
+			String buffer = scope .();
 			char8 next = Try!(Peek());
-			while (next.IsLetterOrDigit || next == '.' ||
-				   next == '-' || next == '_')
+			while (true)
 			{
-				buffer.Append(Try!(Read()));
+				if (next == '"')
+				{
+					let str = Try!(DeserializeString());
+					buffer.Append(str);
+					delete str;
+				}
+				else if (next == '.')
+				{
+					key.Push(buffer);
+					buffer.Clear();
+					Try!(Read());
+				}
+				else if (next.IsLetterOrDigit ||
+				   next == '-' || next == '_')
+					buffer.Append(Try!(Read()));
+				else
+					break;
+				
 				next = Try!(Peek());
 			}
 
+			if (buffer.IsEmpty)
+				Error!("Expected key after dot");
+			
+			key.Push(buffer);
 			return .Ok;
 		}
 
@@ -787,19 +836,96 @@ namespace Toml.Internal
 
 		struct Parent : IDisposable
 		{
-			private int _length;
-			private String _parent;
+			private int _depth;
+			private Key _parent;
 
-			public this(String parent, StringView key)
+			public this(Key parent, StringView key)
 			{
 				_parent = parent;
-				_length = parent.Length;
-				parent.AppendF("{}.", key);
+				_depth = parent.Depth;
+				parent.Push(key);
 			}
 
 			public void Dispose()
 			{
-				_parent.RemoveToEnd(_length);
+				_parent.RestoreDepth(_depth);
+			}
+		}
+
+		class Key
+		{
+			public readonly List<String> Components = new .() ~ DeleteContainerAndItems!(_);
+
+			public int Depth => Components.Count;
+
+			public this() {}
+
+			public this(Key key)
+			{
+				for (let component in key.Components)
+					Components.Add(component);
+			}
+
+			public void Push(StringView component) => Components.Add(new .(component));
+			public void Pop()
+			{
+				delete Components[Components.Count - 1];
+				Components.RemoveAt(Components.Count - 1);
+			}
+
+			public String First() => Components[0];
+
+			public void RemoveFromStart(Key key)
+			{
+				for (let i < key.Depth)
+					delete Components[i];
+				Components.RemoveRange(0, key.Depth);
+			}
+
+			public void RestoreDepth(int depth)
+			{
+				if (Depth > depth)
+				{
+					int excessive = Depth - depth;
+					for (let i < excessive)
+						delete Components[depth + i];
+					Components.RemoveRange(depth, excessive);
+				}
+			}
+
+			public bool IsChildOf(Key other)
+			{
+				if (Depth <= other.Depth)
+					return false;
+
+				for (let i < other.Depth)
+					if (Components[i] != other.Components[i])
+						return false;
+
+				return true;
+			}
+
+			public bool Equals(Key other)
+			{
+				if (Depth != other.Depth)
+					return false;
+
+				for (let i < Components.Count)
+					if (Components[i] != other.Components[i])
+						return false;
+
+				return true;
+			}
+		}
+
+		class State
+		{
+			public Key Parent ~ delete _;
+			public uint InlineDepth;
+
+			public void Used()
+			{
+				Parent = null;
 			}
 		}
 	}

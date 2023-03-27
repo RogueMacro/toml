@@ -9,7 +9,7 @@ namespace Toml.Internal
 		public static bool IsMap(Type type)
 		{
 			return !(type.IsPrimitive ||
-				type.IsEnum ||
+				(type.IsEnum && !type.IsUnion) ||
 				type == typeof(String) ||
 				type == typeof(DateTime) ||
 				(type is SpecializedGenericType &&

@@ -23,8 +23,11 @@ namespace Toml.Internal
 			if (value == null)
 				return;
 
-			let genericType = (typeof(T) as SpecializedGenericType);
+			var key;
+			if (key.Contains('.'))
+				key = key.Quote(.. scope:: .());
 
+			let genericType = (typeof(T) as SpecializedGenericType);
 			if (genericType?.UnspecializedType == typeof(Dictionary<>))
 			{
 				SerializeMap(key, value);

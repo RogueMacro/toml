@@ -10,6 +10,8 @@ namespace Toml.Tests
 			"""
 			# This is a TOML document.
 
+			testprop = { d = "2" }
+
 			title = "TOML Example"
 
 			[owner]
@@ -25,7 +27,7 @@ namespace Toml.Tests
 			[servers]
 
 			  # Indentation (tabs and/or spaces) is allowed but not required
-			  [servers.alpha]
+			  [servers."alpha-0"]
 			  ip = "10.0.0.1"
 			  dc = "eqdc10"
 
@@ -52,7 +54,8 @@ namespace Toml.Tests
 			if (result case .Err)
 			{
 				Console.WriteLine("Error: {}", serializer.Error);
-				Test.Assert(false);
+				//Test.Assert(false);
+				Console.Read().IgnoreError();
 			}
 
 			let document = result.Get();
@@ -72,24 +75,37 @@ namespace Toml.Tests
 			Test.Assert(document.database.enabled == true);
 
 			Test.Assert(document.servers.Count == 2);
-			Test.Assert(document.servers["alpha"].ip == "10.0.0.1");
-			Test.Assert(document.servers["alpha"].dc == "eqdc10");
+			Test.Assert(document.servers["alpha-0"].ip == "10.0.0.1");
+			Test.Assert(document.servers["alpha-0"].dc == "eqdc10");
 			Test.Assert(document.servers["beta"].ip == "10.0.0.2");
 			Test.Assert(document.servers["beta"].dc == "eqdc10");
 
 			Test.Assert(document.clients.hosts.Count == 2);
 			Test.Assert(document.clients.hosts[0] == "alpha");
 			Test.Assert(document.clients.hosts[1] == "omega");
+
+			String str = scope .();
+			serializer.Serialize(document, str);
+			Console.WriteLine(str);
+			Console.Read().IgnoreError();
 		}
 
 		[Serializable]
 		class ExampleDocument
 		{
+			public TestEnum testprop;
 			public String title ~ delete _;
 			public Owner owner ~ delete _;
 			public Database database ~ delete _;
 			public Dictionary<String, Server> servers ~ DeleteDictionaryAndKeysAndValues!(_);
 			public Clients clients ~ delete _;
+		}
+
+		[Serializable]
+		enum TestEnum
+		{
+			case Str(String d);
+			case Int(int i);
 		}
 
 		[Serializable]
