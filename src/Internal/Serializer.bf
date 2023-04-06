@@ -17,17 +17,18 @@ namespace Toml.Internal
 
 		public void SerializeMapStart(int size) { }
 
-		public void SerializeMapEntry<T>(String key, T value, bool first)
-			where T : ISerializable
+		public void SerializeMapEntry<TKey, TValue>(TKey _key, TValue value, bool first)
+			where TKey : ISerializableKey
+			where TValue : ISerializable
 		{
 			if (value == null)
 				return;
 
-			var key;
+			String key = _key.ToKey(.. scope .());
 			if (key.Contains('.'))
 				key = key.Quote(.. scope:: .());
 
-			let genericType = (typeof(T) as SpecializedGenericType);
+			let genericType = (typeof(TValue) as SpecializedGenericType);
 			if (genericType?.UnspecializedType == typeof(Dictionary<>))
 			{
 				SerializeMap(key, value);
@@ -42,7 +43,7 @@ namespace Toml.Internal
 				return;
 			}
 
-			if (!Util.IsMap(typeof(T)))
+			if (!Util.IsMap(typeof(TValue)))
 			{
 				Writer.Write("{} = ", key);
 				value.Serialize(this);

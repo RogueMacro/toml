@@ -196,7 +196,7 @@ namespace Toml.Internal
 		}
 
 		public Result<Dictionary<TKey, TValue>> DeserializeMap<TKey, TValue>()
-			where TKey : String
+			where TKey : ISerializableKey
 			where TValue : ISerializable
 		{
 			Dictionary<TKey, TValue> dict = new .();
@@ -215,7 +215,7 @@ namespace Toml.Internal
 		}
 
 		private Result<void> DeserializeInlineTable<TKey, TValue>(Dictionary<TKey, TValue> dict)
-			where TKey : String
+			where TKey : ISerializableKey
 			where TValue : ISerializable
 		{
 			Expect!('{');
@@ -233,7 +233,7 @@ namespace Toml.Internal
 				Try!(ConsumeWhitespace());
 
 				let value = Try!(TValue.Deserialize(this));
-				dict.Add(new String(key.First()), (.)value);
+				dict.Add(Try!(TKey.Parse(key.First())), (.)value);
 
 				Try!(ConsumeWhitespace());
 			}
@@ -243,7 +243,7 @@ namespace Toml.Internal
 		}
 
 		private Result<void> DeserializeTable<TKey, TValue>(Dictionary<TKey, TValue> dict)
-			where TKey : String
+			where TKey : ISerializableKey
 			where TValue : ISerializable
 		{
 			Result<char8> peek = Peek();
@@ -277,17 +277,22 @@ namespace Toml.Internal
 						if (key.Depth > 1)
 							Reader.[Friend]Position = bracketPos;
 
-						String strKey = key.First();
+						let strKey = key.First();
+						let parsedKey = Try!(TKey.Parse(strKey));
+						bool ok = false;
+						defer { if (!ok) Delete!(parsedKey); }
+
 						using (Parent!(strKey))
 						{
-							if (dict.ContainsKey(strKey))
+							if (dict.ContainsKey(parsedKey))
 							{
-								TryDeserializeTable!(dict[strKey]);
+								Try!(DeserializeTable(dict));
 							}
 							else
 							{
 								let value = Try!(TValue.Deserialize(this));
-								dict.Add(new String(strKey), (.)value);
+								ok = true;
+								dict.Add(parsedKey, (.)value);
 							}
 						}
 
@@ -307,7 +312,8 @@ namespace Toml.Internal
 				Try!(ConsumeWhitespace());
 
 				let value = Try!(TValue.Deserialize(this));
-				dict.Add(new String(key.First()), (.)value);
+				let parsedKey = Try!(TKey.Parse(key.First()));
+				dict.Add(parsedKey, (.)value);
 				
 				Try!(ConsumeLine());
 				peek = Peek();
@@ -799,35 +805,27 @@ namespace Toml.Internal
 		}
 
 		mixin DeleteDictionary<K, V>(Dictionary<K, V> dict)
-			where K : String, delete
+			where K : IHashable, delete
 			where V : delete
 		{
 			DeleteDictionaryAndKeysAndValues!(dict);
 		}
 
 		mixin DeleteDictionary<K, V>(Dictionary<K, V> dict)
-			where K : String, delete
+			where K : IHashable, delete
 		{
 			DeleteDictionaryAndKeys!(dict);
 		}
 
-		mixin DeleteDictionary(var dict)
+		mixin DeleteDictionary(var dict) {}
+
+		mixin Delete<T>(T value)
+			where T : delete
 		{
-			
+			delete value;
 		}
 
-		mixin TryDeserializeTable<T, TKey, TValue>(T dict)
-			where T : Dictionary<TKey, TValue>
-			where TKey : String
-			where TValue : ISerializable
-		{
-			Try!(DeserializeTable(dict));
-		}
-
-		mixin TryDeserializeTable(var dict)
-		{
-			Error!("ERROR");
-		}
+		mixin Delete(var value) {}
 
 		mixin Parent(StringView key)
 		{

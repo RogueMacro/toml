@@ -93,7 +93,7 @@ namespace Toml.Tests
 		[Serializable]
 		class ExampleDocument
 		{
-			public TestEnum testprop;
+			public TestEnum testprop ~ if (testprop case .Str(let val)) delete val;
 			public String title ~ delete _;
 			public Owner owner ~ delete _;
 			public Database database ~ delete _;
