@@ -28,9 +28,12 @@ namespace Toml.Internal
 		{
 			_state.Add(new .()
 				{
-					Parent = new .(_parent),
+					Parent = _parent, // Don't break existing references to parent
 					InlineDepth = _inlineDepth
 				});
+
+			// New state requires cloned parent
+			_parent = new .(_parent);
 		}
 
 		public void PopState()
@@ -861,7 +864,7 @@ namespace Toml.Internal
 			public this(Key key)
 			{
 				for (let component in key.Components)
-					Components.Add(component);
+					Components.Add(new .(component));
 			}
 
 			public void Push(StringView component) => Components.Add(new .(component));
