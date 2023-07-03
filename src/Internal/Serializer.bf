@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using Serialize;
 using Serialize.Implementation;
+using Serialize.Util;
 
 namespace Toml.Internal
 {

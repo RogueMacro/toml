@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Serialize;
 using Serialize.Implementation;
+using Serialize.Util;
 
 namespace Toml.Internal
 {
