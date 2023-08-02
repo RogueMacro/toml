@@ -1,7 +1,7 @@
 [Package]
 Name = "Toml"
-Version = "0.1.4"
+Version = "0.1.5"
 Description = "TOML serialization format"
 
 [Dependencies]
-Serialize = "0.1.4"
+Serialize = "0.1.5"

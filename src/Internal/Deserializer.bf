@@ -74,12 +74,15 @@ namespace Toml.Internal
 
 		public Result<void> DeserializeStructField(delegate Result<void, FieldDeserializeError>(StringView field) deserialize, Span<StringView> fieldsLeft, bool first)
 		{
+			let structFieldStart = Reader.Position;
+
 			if (ConsumeWhitespace() case .Err)
 			{
 				// In case any fields that are lists of objects are left.
 				// Lists of objects can be omitted from the document.
 				// Other types will cause an error, but lists of objects
 				// can be deserialized with no input -> empty list.
+				// Note: Caller should handle if any fields left.
 				for (let field in fieldsLeft)
 				{
 					if (deserialize(field) case .Err)
@@ -105,7 +108,7 @@ namespace Toml.Internal
 					Try!(Read());
 					Try!(Read());
 					Try!(ReadKey(key));
-					Reader.[Friend]Position = pos;
+					Reader.Position = pos;
 
 					key.RemoveFromStart(_parent);
 					let field = key.First();
@@ -117,7 +120,11 @@ namespace Toml.Internal
 							switch (err)
 							{
 							case .UnknownField:
-								ErrorAt!(pos + 2, new $"Unknown member '{field}'", Math.Max(field.Length, 1));
+								//String message = new $"Unknown member '{field}' of {KeyView(_parent, 1)}. Expected ";
+								//JoinList(fieldsLeft, message);
+								//ErrorAt!(pos + 2, message, Math.Max(field.Length, 1));
+								Reader.Position = structFieldStart;
+								return .Ok;
 							case .DeserializationError:
 								return .Err;
 							}
@@ -131,7 +138,7 @@ namespace Toml.Internal
 				Try!(Read());
 				Try!(ConsumeWhitespace());
 				Key key = scope .();
-				let keyPos = Reader.Position;
+				//let keyPos = Reader.Position;
 				Try!(ReadKey(key));
 				Try!(ConsumeWhitespace());
 				Expect!(']');
@@ -142,7 +149,7 @@ namespace Toml.Internal
 				{
 					key.RemoveFromStart(_parent);
 					field = key.First();
-					Reader.[Friend]Position = bracketPos;
+					Reader.Position = bracketPos;
 				}
 
 				using (Parent!(field))
@@ -152,7 +159,11 @@ namespace Toml.Internal
 						switch (err)
 						{
 						case .UnknownField:
-							ErrorAt!(keyPos, new $"Unknown member '{field}'", Math.Max(field.Length, 1));
+							//String message = new $"Unknown member '{field}' of {KeyView(_parent, 1)}. Expected ";
+							//JoinList(fieldsLeft, message);
+							//ErrorAt!(keyPos, message, Math.Max(field.Length, 1));
+							Reader.Position = structFieldStart;
+							return .Ok;
 						case .DeserializationError:
 							return .Err;
 						}
@@ -167,7 +178,7 @@ namespace Toml.Internal
 					Try!(ConsumeWhitespace());
 				}
 
-				let keyPos = Reader.Position;
+				//let keyPos = Reader.Position;
 				Key key = scope .();
 				Try!(ReadKey(key));
 				if (key.Depth > 1)
@@ -185,7 +196,11 @@ namespace Toml.Internal
 					switch (err)
 					{
 					case .UnknownField:
-						ErrorAt!(keyPos, new $"Unknown member '{field}'", Math.Max(field.Length, 1));
+						//String message = new $"Unknown member '{field}' of {_parent}. Expected ";
+						//JoinList(fieldsLeft, message);
+						//ErrorAt!(keyPos, message, Math.Max(field.Length, 1));
+						Reader.Position = structFieldStart;
+						return .Ok;
 					case .DeserializationError:
 						return .Err;
 					}
@@ -270,7 +285,7 @@ namespace Toml.Internal
 					}
 					else if (!key.IsChildOf(_parent))
 					{
-						Reader.[Friend]Position = bracketPos;
+						Reader.Position = bracketPos;
 						return .Ok;
 					}
 					else
@@ -279,7 +294,7 @@ namespace Toml.Internal
 
 						key.RemoveFromStart(_parent);
 						if (key.Depth > 1)
-							Reader.[Friend]Position = bracketPos;
+							Reader.Position = bracketPos;
 
 						let strKey = key.First();
 						let parsedKey = Try!(TKey.Parse(strKey));
@@ -332,7 +347,7 @@ namespace Toml.Internal
 			bool ok = false;
 			defer { if (!ok) DeleteList!(list); }
 
-			if (!_inline && Util.IsMap(typeof(T)))
+			if (!_inline && [ConstEval]Util.IsMapStrict<T>())
 				Try!(DeserializeListOfObjects<T>(list));
 			else
 				Try!(DeserializeInlineList<T>(list));
@@ -393,7 +408,7 @@ namespace Toml.Internal
 					Try!(ReadKey(key2));
 					if (!key2.Equals(key))
 					{
-						Reader.[Friend]Position = pos;
+						Reader.Position = pos;
 						break;
 					}
 				}
@@ -779,6 +794,22 @@ namespace Toml.Internal
 			return AssertEOF!(Reader.Read());
 		}
 
+		void JoinList<T>(Span<T> list, String buffer)
+		{
+			bool first = true;
+			for (let i in 0..<list.Length)
+			{
+				if (first)
+					first = false;
+				else if (i == list.Length - 1)
+					buffer.Append(" or ");
+				else
+					buffer.Append(", ");
+
+				list[i].ToString(buffer);
+			}
+		}
+
 		mixin Error(String message, int length = 1)
 		{
 			ErrorAt!(-1, message, length);
@@ -854,6 +885,30 @@ namespace Toml.Internal
 			}
 		}
 
+		struct KeyView
+		{
+			int offset;
+			int length;
+			Key key;
+
+			public this(Key key, int toEnd)
+			{
+				this.key = key;
+				this.offset = 0;
+				this.length = key.Components.Count - toEnd;
+			}
+
+			public override void ToString(String strBuffer)
+			{
+				if (key.Components.IsEmpty || offset >= key.Components.Count)
+					return;
+
+				key.Components[offset].ToString(strBuffer);
+				for (let c in key.Components[(offset+1)..<(offset+length)])
+					strBuffer.AppendF(".{}", c);
+			}
+		}
+
 		class Key
 		{
 			public readonly List<String> Components = new .() ~ DeleteContainerAndItems!(_);
@@ -917,6 +972,11 @@ namespace Toml.Internal
 						return false;
 
 				return true;
+			}
+
+			public override void ToString(String strBuffer)
+			{
+				
 			}
 		}
 

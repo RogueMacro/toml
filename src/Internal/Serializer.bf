@@ -37,14 +37,14 @@ namespace Toml.Internal
 			}
 
 			if (genericType?.UnspecializedType == typeof(List<>) &&
-				Util.IsMap(genericType.GetGenericArg(0)))
+				Util.IsMap(genericType.GetGenericArg(0), value))
 			{
 				using (Parent!(key))
 					value.Serialize(this);
 				return;
 			}
 
-			if (!Util.IsMap(typeof(TValue)))
+			if (!Util.IsMap(typeof(TValue), value))
 			{
 				Writer.Write("{} = ", key);
 				value.Serialize(this);
@@ -64,7 +64,7 @@ namespace Toml.Internal
 			where T : ISerializable
 		{
 			let genericValueArg = (typeof(T) as SpecializedGenericType).GetGenericArg(1);
-			if (!Util.IsMap(genericValueArg))
+			if (!Util.IsMapStrict(genericValueArg) || Util.CanBePrimitiveOrMap(genericValueArg))
 				Writer.WriteLine("\n[{}{}]", _parent, key);
 
 			using (Parent!(key)) value.Serialize(this);
@@ -73,7 +73,7 @@ namespace Toml.Internal
 		public void SerializeList<T>(List<T> list)
 			where T : ISerializable
 		{
-			if (Util.IsMap(typeof(T)))
+			if (Util.IsMapStrict<T>())
 			{
 				for (let value in list)
 				{
@@ -156,7 +156,7 @@ namespace Toml.Internal
 
 		public void SerializeNull()
 		{
-			Runtime.FatalError("TOML: Can't serialize null");
+			//Runtime.FatalError("TOML: Can't serialize null");
 		}
 
 		mixin Parent(StringView key)
