@@ -50,10 +50,10 @@ namespace Toml.Internal
 
 		public Result<void> DeserializeStructStart(int size)
 		{
-			if (Try!(Peek()) == '{')
+			if (_inline || Peek() case .Ok('{'))
 			{
+				Expect!('{');
 				_inlineDepth++;
-				Try!(Read());
 				Try!(ConsumeWhitespace());
 			}
 
@@ -72,7 +72,7 @@ namespace Toml.Internal
 			return .Ok;
 		}
 
-		public Result<void> DeserializeStructField(delegate Result<void, FieldDeserializeError>(StringView field) deserialize, Span<StringView> fieldsLeft, bool first)
+		public Result<void, FieldDeserializeError> DeserializeStructField(delegate Result<void, FieldDeserializeError>(StringView field) deserialize, Span<StringView> fieldsLeft, bool first)
 		{
 			let structFieldStart = Reader.Position;
 
@@ -83,21 +83,24 @@ namespace Toml.Internal
 				// Other types will cause an error, but lists of objects
 				// can be deserialized with no input -> empty list.
 				// Note: Caller should handle if any fields left.
-				for (let field in fieldsLeft)
-				{
-					if (deserialize(field) case .Err)
-					{
-						if (Reader.EOF)
-							return .Ok;
-						return .Err;
-					}
-				}
+				//for (let field in fieldsLeft)
+				//{
+				//	if (deserialize(field) case .Err(let err))
+				//	{
+				//		if (Reader.EOF)
+				//			return .Ok;
+				//		return .Err(err);
+				//	}
+				//}
 
 				// EOF
 				// Toml doesn't have `null`, so null-values are left out instead.
 				// We don't care about the remaining fields, so we count them as null.
 				return .Ok;
 			}
+
+			if (_inline && Try!(Peek()) == '}')
+				return .Ok;
 
 			if (!_inline && Try!(Peek()) == '[')
 			{
@@ -110,6 +113,12 @@ namespace Toml.Internal
 					Try!(ReadKey(key));
 					Reader.Position = pos;
 
+					if (!key.IsChildOf(_parent))
+					{
+						Reader.Position = structFieldStart;
+						return .Ok;
+					}
+
 					key.RemoveFromStart(_parent);
 					let field = key.First();
 
@@ -120,13 +129,14 @@ namespace Toml.Internal
 							switch (err)
 							{
 							case .UnknownField:
-								//String message = new $"Unknown member '{field}' of {KeyView(_parent, 1)}. Expected ";
-								//JoinList(fieldsLeft, message);
-								//ErrorAt!(pos + 2, message, Math.Max(field.Length, 1));
-								Reader.Position = structFieldStart;
-								return .Ok;
+								String message = new $"Unknown member '{field}'";
+								if (_parent.Depth > 1)
+									message.AppendF($" of {KeyView(_parent, 1)}");
+								message.Append(". Expected ");
+								JoinList(fieldsLeft, message);
+								ErrorAt!(pos + 2, message, Math.Max(field.Length, 1), FieldDeserializeError.UnknownField);
 							case .DeserializationError:
-								return .Err;
+								return .Err(err);
 							}
 						}
 					}
@@ -135,22 +145,28 @@ namespace Toml.Internal
 				}
 
 				let bracketPos = Reader.Position;
-				Try!(Read());
+				Expect!('[');
 				Try!(ConsumeWhitespace());
+
 				Key key = scope .();
-				//let keyPos = Reader.Position;
+				let keyPos = Reader.Position;
 				Try!(ReadKey(key));
+				if (!key.IsChildOf(_parent))
+				{
+					Reader.Position = structFieldStart;
+					return .Ok;
+				}
+				
 				Try!(ConsumeWhitespace());
 				Expect!(']');
 				Try!(ConsumeLine());
 
-				String field = key.First();
-				if (!key.Equals(_parent) && key.Depth > 1)
-				{
-					key.RemoveFromStart(_parent);
-					field = key.First();
+				let parentLength = _parent.Depth > 0 ? _parent.Length + 1 : _parent.Length;
+				key.RemoveFromStart(_parent);
+				let field = key.First();
+
+				if (!key.Equals(_parent) && key.Depth > 1 )
 					Reader.Position = bracketPos;
-				}
 
 				using (Parent!(field))
 				{
@@ -159,13 +175,14 @@ namespace Toml.Internal
 						switch (err)
 						{
 						case .UnknownField:
-							//String message = new $"Unknown member '{field}' of {KeyView(_parent, 1)}. Expected ";
-							//JoinList(fieldsLeft, message);
-							//ErrorAt!(keyPos, message, Math.Max(field.Length, 1));
-							Reader.Position = structFieldStart;
-							return .Ok;
+							String message = new $"Unknown member '{field}'";
+							if (_parent.Depth > 1)
+								message.AppendF($" of {KeyView(_parent, 1)}");
+							message.Append(". Expected ");
+							JoinList(fieldsLeft, message);
+							ErrorAt!(keyPos + parentLength, message, Math.Max(field.Length, 1), FieldDeserializeError.UnknownField);
 						case .DeserializationError:
-							return .Err;
+							return .Err(err);
 						}
 					}
 				}
@@ -178,7 +195,7 @@ namespace Toml.Internal
 					Try!(ConsumeWhitespace());
 				}
 
-				//let keyPos = Reader.Position;
+				let keyPos = Reader.Position;
 				Key key = scope .();
 				Try!(ReadKey(key));
 				if (key.Depth > 1)
@@ -190,23 +207,26 @@ namespace Toml.Internal
 				Expect!('=');
 				Try!(ConsumeWhitespace());
 
-				_inlineDepth++;
-				if (deserialize(field) case .Err(let err))
 				{
-					switch (err)
+					_inlineDepth++;
+					defer { _inlineDepth--; }
+					if (deserialize(field) case .Err(let err))
 					{
-					case .UnknownField:
-						//String message = new $"Unknown member '{field}' of {_parent}. Expected ";
-						//JoinList(fieldsLeft, message);
-						//ErrorAt!(keyPos, message, Math.Max(field.Length, 1));
-						Reader.Position = structFieldStart;
-						return .Ok;
-					case .DeserializationError:
-						return .Err;
+						switch (err)
+						{
+						case .UnknownField:
+							String message = new $"Unknown member '{field}'";
+							if (_parent.Depth > 0)
+								message.AppendF($" of {_parent}");
+							message.Append(". Expected ");
+							JoinList(fieldsLeft, message);
+							ErrorAt!(keyPos, message, Math.Max(field.Length, 1), FieldDeserializeError.UnknownField);
+						case .DeserializationError:
+							return .Err(err);
+						}
 					}
 				}
 
-				_inlineDepth--;
 				if (!_inline)
 					Try!(ConsumeLine());
 			}
@@ -222,7 +242,13 @@ namespace Toml.Internal
 			bool ok = false;
 			defer { if (!ok) DeleteDictionary!(dict); }
 
-			Try!(ConsumeWhitespace());
+			if (ConsumeWhitespace() case .Err)
+			{
+				// EOF
+				ok = true;
+				return dict;
+			}
+
 			let next = Try!(Peek());
 			if (next == '{')
 				Try!(DeserializeInlineTable(dict));
@@ -240,12 +266,19 @@ namespace Toml.Internal
 			Expect!('{');
 			Try!(ConsumeWhitespace());
 
+			bool first = true;
 			while (Try!(Peek()) != '}')
 			{
+				if (!first)
+				{
+					Expect!(',');
+					Try!(ConsumeWhitespace());
+				}
+
 				Key key = scope .();
 				Try!(ReadKey(key));
 				if (key.Depth > 1)
-					Error!("Dotted keys are not supported");
+					Error!(new $"Dotted keys are not supported");
 
 				Try!(ConsumeWhitespace());
 				Expect!('=');
@@ -255,6 +288,7 @@ namespace Toml.Internal
 				dict.Add(Try!(TKey.Parse(key.First())), (.)value);
 
 				Try!(ConsumeWhitespace());
+				first = false;
 			}
 
 			Expect!('}');
@@ -270,6 +304,9 @@ namespace Toml.Internal
 			{
 				if (next == '[')
 				{
+					if (Try!(Peek(1)) == '[')
+						return .Ok;
+
 					let bracketPos = Reader.Position;
 					Expect!('[');
 					Key key = scope .();
@@ -324,11 +361,14 @@ namespace Toml.Internal
 				Key key = scope .();
 				Try!(ReadKey(key));
 				if (key.Depth > 1)
-					Error!("Dotted keys are not supported");
+					Error!(new $"Dotted keys are not supported");
 
 				Try!(ConsumeWhitespace());
 				Expect!('=');
 				Try!(ConsumeWhitespace());
+
+				_inlineDepth++;
+				defer { _inlineDepth--; }
 
 				let value = Try!(TValue.Deserialize(this));
 				let parsedKey = Try!(TKey.Parse(key.First()));
@@ -347,8 +387,8 @@ namespace Toml.Internal
 			bool ok = false;
 			defer { if (!ok) DeleteList!(list); }
 
-			if (!_inline && [ConstEval]Util.IsMapStrict<T>())
-				Try!(DeserializeListOfObjects<T>(list));
+			if (!_inline && DeserializeListOfObjects<T>(list) case .Ok)
+				ok = true;
 			else
 				Try!(DeserializeInlineList<T>(list));
 			
@@ -385,6 +425,10 @@ namespace Toml.Internal
 
 		private Result<void> DeserializeListOfObjects<T>(List<T> list) where T : ISerializable
 		{
+			if (Try!(Peek()) != '[' ||
+				Try!(Peek(1)) != '[')
+				return .Err;
+
 			Key key = scope .();
 
 			while (true)
@@ -429,25 +473,32 @@ namespace Toml.Internal
 			String string = scope .();
 
 			Expect!('"');
+			bool escape = false;
 			while (true)
 			{
 				let char = Try!(Read());
 				if (char == '\n')
 					Error!(new $"Unescaped newline not allowed in strings");
-				else if (char == '"')
+				else if (char == '"' && !escape /*&& !string.IsEmpty && string[^1] != '\\'*/)
 					break;
 
+				if (escape)
+					escape = false;
+
 				string.Append(char);
+
+				if (char == '\\')
+					escape = true;
 			}
 
-			String escaped = new .();
-			if (string.Unescape(escaped) case .Err)
+			String unescaped = new .();
+			if (string.Unescape(unescaped) case .Err)
 			{
-				delete escaped;
+				delete unescaped;
 				return .Err;
 			}
 
-			return escaped;
+			return unescaped;
 		}
 
 		// TODO: Support '0b' and '0o' prefix
@@ -558,10 +609,8 @@ namespace Toml.Internal
 				str.Append(Try!(Read()));
 			}
 
-			if (double.Parse(str) case .Ok(let val))
-			{
+			if (!str.IsEmpty && double.Parse(str) case .Ok(let val))
 				return val;
-			}
 
 			ErrorAt!(pos, new $"Invalid decimal number", Reader.Position - pos);
 		}
@@ -686,6 +735,8 @@ namespace Toml.Internal
 				else if (next.IsLetterOrDigit ||
 				   next == '-' || next == '_')
 					buffer.Append(Try!(Read()));
+				else if (buffer.IsEmpty)
+					Error!(new $"Invalid character {next}");
 				else
 					break;
 				
@@ -693,7 +744,7 @@ namespace Toml.Internal
 			}
 
 			if (buffer.IsEmpty)
-				Error!("Expected key after dot");
+				Error!(new $"Expected key after dot");
 			
 			key.Push(buffer);
 			return .Ok;
@@ -815,10 +866,10 @@ namespace Toml.Internal
 			ErrorAt!(-1, message, length);
 		}
 
-		mixin ErrorAt(int position, String message, int length = 1)
+		mixin ErrorAt(int position, String message, int length = 1, FieldDeserializeError err = FieldDeserializeError.DeserializationError)
 		{
 			SetError(new .(message, this, length, position));
-			return .Err;
+			return .Err(err);
 		}
 
 		mixin AssertEOF(var result)
@@ -848,6 +899,15 @@ namespace Toml.Internal
 
 		mixin DeleteDictionary<K, V>(Dictionary<K, V> dict)
 			where K : IHashable, delete
+			where V : IDisposable
+		{
+			for (var value in dict.Values)
+				value.Dispose();
+			DeleteDictionaryAndKeys!(dict);
+		}
+
+		mixin DeleteDictionary<K, V>(Dictionary<K, V> dict)
+			where K : IHashable, delete
 		{
 			DeleteDictionaryAndKeys!(dict);
 		}
@@ -861,6 +921,20 @@ namespace Toml.Internal
 		}
 
 		mixin Delete(var value) {}
+
+		mixin Try<T>(Result<T, FieldDeserializeError> result, FieldDeserializeError? err = null)
+		{
+			if (result case .Err(let originErr))
+				return .Err(err ?? originErr);
+			result.Get()
+		}
+
+		mixin Try<T>(Result<T> result, FieldDeserializeError err = FieldDeserializeError.DeserializationError)
+		{
+			if (result case .Err)
+				return .Err(err);
+			result.Get()
+		}
 
 		mixin Parent(StringView key)
 		{
@@ -900,7 +974,7 @@ namespace Toml.Internal
 
 			public override void ToString(String strBuffer)
 			{
-				if (key.Components.IsEmpty || offset >= key.Components.Count)
+				if (key.Components.IsEmpty || offset >= key.Components.Count || length == 0)
 					return;
 
 				key.Components[offset].ToString(strBuffer);
@@ -914,6 +988,13 @@ namespace Toml.Internal
 			public readonly List<String> Components = new .() ~ DeleteContainerAndItems!(_);
 
 			public int Depth => Components.Count;
+
+			public int Length => {
+				int length = Components.Count > 1 ? Components.Count - 1 : 0;
+				for (let c in Components)
+					length += c.Length;
+				length
+			}
 
 			public this() {}
 
@@ -976,7 +1057,7 @@ namespace Toml.Internal
 
 			public override void ToString(String strBuffer)
 			{
-				
+				strBuffer.Join(".", Components.GetEnumerator());
 			}
 		}
 

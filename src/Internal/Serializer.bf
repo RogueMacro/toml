@@ -16,7 +16,24 @@ namespace Toml.Internal
 
 		private String _parent = new .() ~ delete _;
 
-		public void SerializeMapStart(int size) { }
+		private int _depth => _parent.Count('.');
+		private int _inlineDepth = 0;
+		private bool _inline => _inlineDepth > 0;
+
+		private PrettyLevel _pretty;
+
+		public this(PrettyLevel pretty)
+		{
+			_pretty = pretty;
+		}
+
+		public void SerializeMapStart(int size, Type callerType = Compiler.CallerType)
+		{
+			if (_inline)
+				Write!("{ ");
+			else if (!_parent.IsEmpty && (!Util.IsMap(Util.GetInnerType(callerType)) || size != 1))
+				WriteLine!("\n[{}]", _parent[...^2]);
+		}
 
 		public void SerializeMapEntry<TKey, TValue>(TKey _key, TValue value, bool first)
 			where TKey : ISerializableKey
@@ -29,65 +46,48 @@ namespace Toml.Internal
 			if (key.Contains('.'))
 				key = key.Quote(.. scope:: .());
 
-			let genericType = (typeof(TValue) as SpecializedGenericType);
-			if (genericType?.UnspecializedType == typeof(Dictionary<>))
-			{
-				SerializeMap(key, value);
-				return;
-			}
-
-			if (genericType?.UnspecializedType == typeof(List<>) &&
-				Util.IsMap(genericType.GetGenericArg(0), value))
+			let inner = Util.GetInnerType(typeof(TValue));
+			if (Util.IsMap(value) || (inner != null && Util.IsMap(inner)))
 			{
 				using (Parent!(key))
 					value.Serialize(this);
-				return;
-			}
-
-			if (!Util.IsMap(typeof(TValue), value))
-			{
-				Writer.Write("{} = ", key);
-				value.Serialize(this);
-				Writer.WriteLine();
 			}
 			else
 			{
-				Writer.WriteLine("\n[{}{}]", _parent, key);
-				using (Parent!(key))
-					value.Serialize(this);
+				Write!("{} = ", key);
+				value.Serialize(this);
+				if (!_inline)
+					WriteLine!();
 			}
 		}
 
-		public void SerializeMapEnd() { }
-
-		private void SerializeMap<T>(String key, T value)
-			where T : ISerializable
+		public void SerializeMapEnd()
 		{
-			let genericValueArg = (typeof(T) as SpecializedGenericType).GetGenericArg(1);
-			if (!Util.IsMapStrict(genericValueArg) || Util.CanBePrimitiveOrMap(genericValueArg))
-				Writer.WriteLine("\n[{}{}]", _parent, key);
-
-			using (Parent!(key)) value.Serialize(this);
+			if (_inline)
+				Write!(" }");
 		}
 
 		public void SerializeList<T>(List<T> list)
 			where T : ISerializable
 		{
-			if (Util.IsMapStrict<T>())
+			if (Util.IsMap<T>())
 			{
 				for (let value in list)
 				{
 					if (value == null)
 						continue;
 
-					Writer.WriteLine("\n[[{}]]", _parent.Substring(0, _parent.Length - 1));
+					WriteLine!("\n[[{}]]", _parent.Substring(0, _parent.Length - 1));
 					value.Serialize(this);
 				}
 
 				return;
 			}
 
-			Writer.Write("[");
+			bool pretty = _pretty.HasFlag(.LongLists) && list.Count > 3;
+
+			Write!("[");
+			_inlineDepth++;
 
 			bool first = true;
 			for (let value in list)
@@ -96,37 +96,44 @@ namespace Toml.Internal
 					continue;
 
 				if (!first)
-					Writer.Write(", ");
+					Write!(", ");
+
+				if (pretty)
+					Write!("\n    ");
+
 				value.Serialize(this);
 				first = false;
 			}
 
-			Writer.Write("]");
+			_inlineDepth--;
+			if (pretty)
+				WriteLine!();
+			Write!("]");
 		}
 
 		public void SerializeString(String string)
 		{
-			Writer.Write("\"{}\"", string.Escape(.. scope .()));
+			Write!("\"{}\"", string.Escape(.. scope .()));
 		}
 
 		public void SerializeInt(int i)
 		{
-			Writer.Write("{}", i);
+			Write!("{}", i);
 		}
 
 		public void SerializeUInt(uint i)
 		{
-			Writer.Write("{}", i);
+			Write!("{}", i);
 		}
 
 		public void SerializeDouble(double i)
 		{
-			Writer.Write("{}", i);
+			Write!("{}", i);
 		}
 
 		public void SerializeFloat(float i)
 		{
-			Writer.Write(i.ToString(.. scope .(), NumberFormat, null));
+			Write!(i.ToString(.. scope .(), NumberFormat, null));
 		}
 
 		public void SerializeDateTime(DateTime date)
@@ -135,28 +142,67 @@ namespace Toml.Internal
 			let hasTime = date.Hour != 0 || date.Minute != 0 || date.Second != 0;
 
 			if (hasDate)
-				Writer.Write("{0:yyyy-MM-dd}", date);
+				Write!("{0:yyyy-MM-dd}", date);
 
 			if (hasDate && hasTime)
-				Writer.Write(" ");
+				Write!(" ");
 
 			if (hasTime)
 			{
 				if (date.Millisecond != 0)
-					Writer.Write("{0:HH:mm:ss.fffK}", date);
+					Write!("{0:HH:mm:ss.fffK}", date);
 				else
-					Writer.Write("{0:HH:mm:ssK}", date);
+					Write!("{0:HH:mm:ssK}", date);
 			}
 		}
 
 		public void SerializeBool(bool b)
 		{
-			Writer.Write(b ? "true" : "false");
+			Write!(b ? "true" : "false");
 		}
 
 		public void SerializeNull()
 		{
 			//Runtime.FatalError("TOML: Can't serialize null");
+		}
+
+		mixin WriteInner(String text)
+		{
+			if (_pretty.HasFlag(.Indentation))
+			{
+				int i = text.IndexOf('\n');
+				while (i != -1)
+				{
+					text.Insert(i + 1, ' ', 4 * (_depth - 1));
+					i = text.IndexOf('\n', i + 1);
+				}
+			}
+
+			Writer.Write(text);
+		}
+
+		mixin Write(StringView fmt)
+		{
+			WriteInner!(scope String(fmt));
+		}
+
+		mixin Write(StringView fmt, Object arg)
+		{
+			WriteInner!(scope String()..AppendF(fmt, arg));
+		}
+
+		mixin WriteLine()
+		{
+			Write!("\n");
+		}
+
+		mixin WriteLine(StringView fmt, Object arg)
+		{
+			WriteInner!(
+				scope String()
+				..AppendF(fmt, arg)
+				..Append('\n')
+			);
 		}
 
 		mixin Parent(StringView key)

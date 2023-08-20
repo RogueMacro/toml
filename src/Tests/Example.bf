@@ -49,7 +49,7 @@ namespace Toml.Tests
 		[Test]
 		public static void StandardExample()
 		{
-			let serializer = scope Serialize<Toml>();
+			let serializer = scope Serializer<Toml>();
 			let result = serializer.Deserialize<ExampleDocument>(ExampleDocumentText);
 			if (result case .Err)
 			{
